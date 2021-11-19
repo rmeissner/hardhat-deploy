@@ -55,11 +55,11 @@
     "solhint-plugin-prettier": "^0.0.5",
     "source-map-support": "^0.5.12",
     "ts-node": "^10.2.1",
-    "typescript": "^4.3.5"
+    "typescript": "^4.3.5",
+    "web3": "^1.6.1"
   },
   "peerDependencies": {
     "@ethersproject/hardware-wallets": "^5.0.14",
-    "ethers": "^5.0.14",
     "hardhat": "^2.0.0"
   },
   "dependencies": {
@@ -75,13 +75,14 @@
     "@ethersproject/transactions": "^5.4.0",
     "@ethersproject/wallet": "^5.4.0",
     "@gnosis.pm/safe-core-sdk": "^1.0.0",
-    "@gnosis.pm/safe-ethers-adapters": "^0.1.0-alpha.1",
+    "@gnosis.pm/safe-ethers-adapters": "0.1.0-alpha.6",
     "@types/qs": "^6.9.7",
     "axios": "^0.21.1",
     "chalk": "^4.1.2",
     "chokidar": "^3.5.2",
     "debug": "^4.3.2",
     "enquirer": "^2.3.6",
+    "ethers": "5.4.0",
     "form-data": "^4.0.0",
     "fs-extra": "^10.0.0",
     "match-all": "^1.2.6",
