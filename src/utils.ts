@@ -303,8 +303,10 @@ function transformNamedAccounts(
               addressesToProtocol[address.toLowerCase()] =
                 'privatekey://' + protocolSplit[1];
             } else if (protocolSplit[0].toLowerCase() === 'safe') {
-              const split = protocolSplit[1].split(':');
-              address = split[1];
+              console.log({spec})
+              const split = spec.substr(7).split('##');
+              console.log({split})
+              address = split[0];
               addressesToProtocol[address.toLowerCase()] = spec;
             } else {
               throw new Error(

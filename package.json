@@ -47,6 +47,7 @@
     "dotenv": "^6.2.0",
     "eslint": "^7.7.0",
     "eslint-config-prettier": "^6.11.0",
+    "ethers": "^5.3.0",
     "hardhat": "^2.0.0",
     "mocha": "^5.2.0",
     "prettier": "^2.0.5",
@@ -59,6 +60,8 @@
   },
   "peerDependencies": {
     "@ethersproject/hardware-wallets": "^5.0.14",
+    "@gnosis.pm/safe-ethers-adapters": "^0.1.0-alpha.1",
+    "ethers": "^5.0.14",
     "hardhat": "^2.0.0"
   },
   "dependencies": {

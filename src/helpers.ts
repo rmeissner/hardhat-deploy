@@ -48,7 +48,9 @@ import ownershipFacet from '../extendedArtifacts/OwnershipFacet.json';
 import diamantaire from '../extendedArtifacts/Diamantaire.json';
 import {Artifact, EthereumProvider, Network} from 'hardhat/types';
 import {DeploymentsManager} from './DeploymentsManager';
-import {SafeProviderAdapter} from './safe/adapter';
+// TODO: convert to require
+import EthersSafe from '@gnosis.pm/safe-core-sdk';
+import {SafeEthersSigner, SafeFactory, SafeService} from '@gnosis.pm/safe-ethers-adapters';
 
 let LedgerSigner: any; // TODO type
 
@@ -1195,6 +1197,7 @@ Plus they are only used when the contract is meant to be used as standalone when
     from?: string,
     optional?: boolean
   ): {address?: Address; ethersSigner?: Signer; hardwareWallet?: string} {
+    log("_getFrom", from)
     let ethersSigner: Signer | undefined;
     let hardwareWallet: string | undefined = undefined;
     if (!from) {
@@ -1229,19 +1232,19 @@ Plus they are only used when the contract is meant to be used as standalone when
           } else if (registeredProtocol.startsWith('privatekey')) {
             ethersSigner = new Wallet(registeredProtocol.substr(13), provider);
           } else if (registeredProtocol.startsWith('safe')) {
-            const split = registeredProtocol.substr(7).split(':');
-            const signer = provider.getSigner(split[0]);
-            const safeAddress = split[1];
-            ethersSigner = new Web3Provider(
-              fixProvider(
-                new SafeProviderAdapter(
-                  network.provider,
-                  signer,
-                  safeAddress
-                  // serivceUrl // TODO
-                )
-              )
-            ).getSigner(); // this return the first account right now, need a special safe ethersSIgner
+            const split = registeredProtocol.substr(7).split('##');
+            log("Safe Proto", split)
+            const safeAddress = split[0];
+            const signer = _getFrom(split[1]).ethersSigner;
+            const serviceUrl = split[2];
+            log("serviceUrl", serviceUrl)
+            const service = new SafeService(serviceUrl)
+            const { ethers } = require('ethers')
+            console.log(provider)
+            const factory: any = EthersSafe.create({ethers, safeAddress, providerOrSigner: signer})
+            Object.assign(factory, { getAddress: () => safeAddress })
+            log("factory", factory)
+            ethersSigner = new SafeEthersSigner(factory, service, provider)
           }
         }
       }
