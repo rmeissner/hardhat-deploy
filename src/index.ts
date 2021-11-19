@@ -10,7 +10,9 @@ import {
   EthereumProvider,
   Artifact,
   BuildInfo,
+  NetworkConfig,
 } from 'hardhat/types';
+import {createProvider} from 'hardhat/internal/core/providers/construction'; // TODO harhdat argument types not from internal
 import {Deployment, ExtendedArtifact} from '../types';
 import {extendEnvironment, task, subtask, extendConfig} from 'hardhat/config';
 import {HARDHAT_NETWORK_NAME, HardhatPluginError} from 'hardhat/plugins';
@@ -32,6 +34,7 @@ import {submitSources} from './etherscan';
 import {submitSourcesToSourcify} from './sourcify';
 import {Network} from 'hardhat/types/runtime';
 import {store} from './globalStore';
+import {getDeployPaths, getNetworkName} from './utils';
 
 export const TASK_DEPLOY = 'deploy';
 export const TASK_DEPLOY_MAIN = 'deploy:main';
@@ -107,6 +110,8 @@ extendConfig(
       config.namedAccounts = {};
     }
 
+    config.deterministicDeployment = userConfig.deterministicDeployment;
+
     if (userConfig.external) {
       if (!config.external) {
         config.external = {};
@@ -157,16 +162,44 @@ extendConfig(
   }
 );
 
-function networkFromConfig(env: HardhatRuntimeEnvironment, network: Network) {
+function createNetworkFromConfig(
+  env: HardhatRuntimeEnvironment,
+  networkName: string,
+  config: NetworkConfig
+): Network {
+  const tags: {[tag: string]: boolean} = {};
+  const tagsCollected = config.tags || [];
+  for (const tag of tagsCollected) {
+    tags[tag] = true;
+  }
+
+  const network = {
+    name: networkName,
+    config,
+    live: config.live,
+    saveDeployments: config.saveDeployments,
+    tags,
+    deploy: config.deploy || env.config.paths.deploy,
+    companionNetworks: {},
+  };
+  networkFromConfig(env, network as Network, false);
+  return network as Network;
+}
+
+function networkFromConfig(
+  env: HardhatRuntimeEnvironment,
+  network: Network,
+  companion: boolean
+) {
   let live = true;
-  if (network.name === 'localhost' || network.name === 'hardhat') {
+  const networkName = network.name; // cannot use fork here as this could be set via task, T
+  if (networkName === 'localhost' || networkName === 'hardhat') {
     // the 2 default network are not live network
     live = false;
   }
   if (network.config.live !== undefined) {
     live = network.config.live;
   }
-  network.live = live;
 
   // associate tags to current network as object
   network.tags = {};
@@ -180,11 +213,18 @@ function networkFromConfig(env: HardhatRuntimeEnvironment, network: Network) {
   } else {
     network.deploy = env.config.paths.deploy;
   }
-  store.networkDeployPaths[network.name] = network.deploy; // fallback to global store
+
+  if (companion && network.config.companionNetworks) {
+    network.companionNetworks = network.config.companionNetworks;
+  } else {
+    network.companionNetworks = {};
+  }
 
   if (network.config.live !== undefined) {
     live = network.config.live;
   }
+
+  network.live = live;
 
   if (network.config.saveDeployments === undefined) {
     network.saveDeployments = true;
@@ -196,22 +236,78 @@ function networkFromConfig(env: HardhatRuntimeEnvironment, network: Network) {
 log('start...');
 let deploymentsManager: DeploymentsManager;
 extendEnvironment((env) => {
-  networkFromConfig(env, env.network);
+  networkFromConfig(env, env.network, true);
   if (deploymentsManager === undefined || env.deployments === undefined) {
     deploymentsManager = new DeploymentsManager(
       env,
       lazyObject(() => env.network) // IMPORTANT, else other plugin cannot set env.network before end, like solidity-coverage does here in the coverage task :  https://github.com/sc-forks/solidity-coverage/blob/3c0f3a5c7db26e82974873bbf61cf462072a7c6d/plugins/resources/nomiclabs.utils.js#L93-L98
     );
     env.deployments = deploymentsManager.deploymentsExtension;
-    env.getNamedAccounts = deploymentsManager.getNamedAccounts.bind(
-      deploymentsManager
-    );
-    env.getUnnamedAccounts = deploymentsManager.getUnnamedAccounts.bind(
-      deploymentsManager
-    );
+    env.getNamedAccounts =
+      deploymentsManager.getNamedAccounts.bind(deploymentsManager);
+    env.getUnnamedAccounts =
+      deploymentsManager.getUnnamedAccounts.bind(deploymentsManager);
     env.getChainId = () => {
       return deploymentsManager.getChainId();
     };
+
+    for (const networkName of Object.keys(env.config.networks)) {
+      const config = env.config.networks[networkName];
+      if (!('url' in config) || networkName === 'hardhat') {
+        continue;
+      }
+      store.networks[networkName] = createNetworkFromConfig(
+        env,
+        networkName,
+        config
+      );
+    }
+
+    env.companionNetworks = {};
+    for (const name of Object.keys(env.network.companionNetworks)) {
+      const networkName = env.network.companionNetworks[name];
+      // TODO Fork case ?
+      if (networkName === env.network.name) {
+        deploymentsManager.addCompanionManager(name, deploymentsManager);
+        const extraNetwork = {
+          deployments: deploymentsManager.deploymentsExtension,
+          getNamedAccounts: () => deploymentsManager.getNamedAccounts(),
+          getUnnamedAccounts: () => deploymentsManager.getUnnamedAccounts(),
+          getChainId: () => deploymentsManager.getChainId(),
+          provider: lazyObject(() => env.network.provider),
+        };
+        env.companionNetworks[name] = extraNetwork;
+        continue;
+      }
+      const config = env.config.networks[networkName];
+      if (!('url' in config) || networkName === 'hardhat') {
+        throw new Error(
+          `in memory network like hardhat are not supported as companion network`
+        );
+      }
+
+      const network = store.networks[networkName];
+      if (!network) {
+        throw new Error(`no network named ${networkName}`);
+      }
+      network.provider = createProvider(
+        networkName,
+        config,
+        env.config.paths,
+        env.artifacts
+      );
+      const networkDeploymentsManager = new DeploymentsManager(env, network);
+      deploymentsManager.addCompanionManager(name, networkDeploymentsManager);
+      const extraNetwork = {
+        deployments: networkDeploymentsManager.deploymentsExtension,
+        getNamedAccounts: () => networkDeploymentsManager.getNamedAccounts(),
+        getUnnamedAccounts: () =>
+          networkDeploymentsManager.getUnnamedAccounts(),
+        getChainId: () => networkDeploymentsManager.getChainId(),
+        provider: network.provider,
+      };
+      env.companionNetworks[name] = extraNetwork;
+    }
   }
   log('ready');
 });
@@ -291,6 +387,13 @@ subtask(TASK_DEPLOY_RUN_DEPLOY, 'deploy run only')
     undefined,
     types.string
   )
+  .addOptionalParam('maxfee', 'max fee per gas', undefined, types.string)
+  .addOptionalParam(
+    'priorityfee',
+    'max priority fee per gas',
+    undefined,
+    types.string
+  )
   .addFlag('reset', 'whether to delete deployments files first')
   .addFlag('log', 'whether to output log')
   .setAction(async (args) => {
@@ -307,6 +410,8 @@ subtask(TASK_DEPLOY_RUN_DEPLOY, 'deploy run only')
       exportAll: args.exportAll,
       savePendingTx: args.pendingtx,
       gasPrice: args.gasprice,
+      maxFeePerGas: args.maxfee,
+      maxPriorityFeePerGas: args.priorityfee,
     });
   });
 
@@ -337,6 +442,13 @@ subtask(TASK_DEPLOY_MAIN, 'deploy')
     undefined,
     types.string
   )
+  .addOptionalParam('maxfee', 'max fee per gas', undefined, types.string)
+  .addOptionalParam(
+    'priorityfee',
+    'max priority fee per gas',
+    undefined,
+    types.string
+  )
   .addFlag('noCompile', 'disable pre compilation')
   .addFlag('reset', 'whether to delete deployments files first')
   .addFlag('log', 'whether to output log')
@@ -352,17 +464,6 @@ subtask(TASK_DEPLOY_MAIN, 'deploy')
       );
     }
 
-    if (
-      nodeTaskArgs.forkDeployments &&
-      nodeTaskArgs.forkDeployments !== 'localhost'
-    ) {
-      // copy existing deployment from specified netwotk into localhost deployment folder
-      fs.copy(
-        path.join(hre.config.paths.deployments, nodeTaskArgs.forkDeployments),
-        path.join(hre.config.paths.deployments, 'localhost')
-      );
-    }
-
     async function compileAndDeploy() {
       if (!args.noCompile) {
         await hre.run('compile');
@@ -374,8 +475,7 @@ subtask(TASK_DEPLOY_MAIN, 'deploy')
       [name: string]: Deployment;
     }> | null = args.watchOnly ? null : compileAndDeploy();
     if (args.watch || args.watchOnly) {
-      const deployPaths =
-        hre.network.deploy || store.networkDeployPaths[hre.network.name]; // fallback to global store
+      const deployPaths = getDeployPaths(hre.network);
       const watcher = chokidar.watch(
         [hre.config.paths.sources, ...deployPaths],
         {
@@ -490,6 +590,13 @@ task(TASK_DEPLOY, 'Deploy contracts')
     undefined,
     types.string
   )
+  .addOptionalParam('maxfee', 'max fee per gas', undefined, types.string)
+  .addOptionalParam(
+    'priorityfee',
+    'max priority fee per gas',
+    undefined,
+    types.string
+  )
   .addOptionalParam(
     'deployScripts',
     'override deploy script folder path',
@@ -510,7 +617,9 @@ task(TASK_DEPLOY, 'Deploy contracts')
       hre.network.deploy = [
         normalizePath(hre.config, args.deployScripts, args.deployScripts),
       ];
-      store.networkDeployPaths[hre.network.name] = hre.network.deploy; // fallback to global store
+      if (store.networks[getNetworkName(hre.network)]) {
+        store.networks[getNetworkName(hre.network)].deploy = hre.network.deploy; // fallback to global store
+      }
     }
     args.log = !args.silent;
     delete args.silent;
@@ -563,15 +672,10 @@ task(TASK_NODE, 'Starts a JSON-RPC server on top of Hardhat EVM')
     undefined,
     types.string
   )
+  .addOptionalParam('maxfee', 'max fee per gas', undefined, types.string)
   .addOptionalParam(
-    'forkDeployments',
-    'this will use deployment from the named network, default to "localhost"',
-    'localhost',
-    types.string
-  )
-  .addOptionalParam(
-    'asNetwork',
-    'network name to be used, default to "localhost" (or to `--fork-deployments` value)',
+    'priorityfee',
+    'max priority fee per gas',
     undefined,
     types.string
   )
@@ -597,6 +701,8 @@ you can specifiy hardhat via "--network hardhat"
       );
     }
 
+    deploymentsManager.runAsNode(true);
+
     // console.log('node', args);
     await runSuper(args);
   });
@@ -604,6 +710,11 @@ you can specifiy hardhat via "--network hardhat"
 subtask(TASK_NODE_GET_PROVIDER).setAction(
   async (args, hre, runSuper): Promise<EthereumProvider> => {
     const provider = await runSuper(args);
+
+    if (!nodeTaskArgs.noReset) {
+      await deploymentsManager.deletePreviousDeployments('localhost');
+    }
+
     if (nodeTaskArgs.noDeploy) {
       // console.log('skip');
       return provider;
@@ -611,23 +722,23 @@ subtask(TASK_NODE_GET_PROVIDER).setAction(
     // console.log('enabling logging');
     await enableProviderLogging(provider, false);
 
-    // TODO add another optional param that can change the network name : `--as-network` ?
-    if (
-      isHardhatEVM(hre) ||
-      nodeTaskArgs.forkDeployments ||
-      nodeTaskArgs.asNetwork
-    ) {
-      // TODO what about accounts and other config.networks[name] ?
-      hre.network.name =
-        nodeTaskArgs.asNetwork || nodeTaskArgs.forkDeployments || 'localhost'; // Ensure it use same config as network
+    const networkName = getNetworkName(hre.network);
+    if (networkName !== hre.network.name) {
+      console.log(`copying ${networkName}'s deployment to localhost...`);
+      // copy existing deployment from specified netwotk into localhost deployment folder
+      fs.copy(
+        path.join(hre.config.paths.deployments, networkName),
+        path.join(hre.config.paths.deployments, 'localhost')
+      );
     }
+
     nodeTaskArgs.log = !nodeTaskArgs.silent;
     delete nodeTaskArgs.silent;
     nodeTaskArgs.pendingtx = false;
     await hre.run(TASK_DEPLOY_MAIN, {
       ...nodeTaskArgs,
       watch: false,
-      reset: !nodeTaskArgs.noReset,
+      reset: false,
     });
 
     await enableProviderLogging(provider, true);
@@ -670,6 +781,10 @@ task(TASK_ETHERSCAN_VERIFY, 'submit contract source code to etherscan')
     'force the use of the license specified by --license option'
   )
   .addFlag(
+    'sleep',
+    'sleep 500ms between each verification, so API rate limit is not exceeded'
+  )
+  .addFlag(
     'solcInput',
     'fallback on solc-input (useful when etherscan fails on the minimum sources, see https://github.com/ethereum/solidity/issues/9573)'
   )
@@ -693,6 +808,7 @@ task(TASK_ETHERSCAN_VERIFY, 'submit contract source code to etherscan')
       license: args.license,
       fallbackOnSolcInput: args.solcInput,
       forceLicense: args.forceLicense,
+      sleepBetween: args.sleep,
       // logHttpRequestOnError: args.logHttpRequestOnError
     });
   });

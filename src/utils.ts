@@ -10,6 +10,7 @@ import {ExtendedArtifact, MultiExport} from '../types';
 import {Artifacts} from 'hardhat/internal/artifacts';
 import murmur128 from 'murmur-128';
 import {Transaction} from '@ethersproject/transactions';
+import {store} from './globalStore';
 
 function getOldArtifactSync(
   name: string,
@@ -56,8 +57,11 @@ export async function getExtendedArtifactFromFolder(
     const hardhatArtifact: Artifact = await artifacts.readArtifact(name);
     // check if name is already a fullyQualifiedName
     let fullyQualifiedName = name;
+    let contractName = name;
     if (!fullyQualifiedName.includes(':')) {
       fullyQualifiedName = `${hardhatArtifact.sourceName}:${name}`;
+    } else {
+      contractName = fullyQualifiedName.split(':')[1];
     }
     const buildInfo = await artifacts.getBuildInfo(fullyQualifiedName);
     if (buildInfo) {
@@ -65,7 +69,7 @@ export async function getExtendedArtifactFromFolder(
       const solcInputHash = Buffer.from(murmur128(solcInput)).toString('hex');
       artifact = {
         ...hardhatArtifact,
-        ...buildInfo.output.contracts[hardhatArtifact.sourceName][name],
+        ...buildInfo.output.contracts[hardhatArtifact.sourceName][contractName],
         solcInput,
         solcInputHash,
       };
@@ -294,9 +298,8 @@ function transformNamedAccounts(
           if (protocolSplit.length > 1) {
             if (protocolSplit[0].toLowerCase() === 'ledger') {
               address = protocolSplit[1];
-              addressesToProtocol[
-                address.toLowerCase()
-              ] = protocolSplit[0].toLowerCase();
+              addressesToProtocol[address.toLowerCase()] =
+                protocolSplit[0].toLowerCase();
               // knownAccountsDict[address.toLowerCase()] = true; // TODO ? this would prevent auto impersonation in fork/test
             } else if (protocolSplit[0].toLowerCase() === 'privatekey') {
               address = new Wallet(protocolSplit[1]).address;
@@ -432,7 +435,7 @@ export function processNamedAccounts(
       namedAccounts,
       chainIdGiven,
       accounts,
-      process.env.HARDHAT_DEPLOY_ACCOUNTS_NETWORK || network.name
+      process.env.HARDHAT_DEPLOY_ACCOUNTS_NETWORK || getNetworkName(network)
     );
   } else {
     return {
@@ -488,6 +491,25 @@ export const traverse = function (
   });
   return result;
 };
+
+export function getNetworkName(network: Network): string {
+  if (process.env['HARDHAT_DEPLOY_FORK']) {
+    return process.env['HARDHAT_DEPLOY_FORK'];
+  }
+  if ('forking' in network.config && (network.config.forking as any)?.network) {
+    return (network.config.forking as any)?.network;
+  }
+  return network.name;
+}
+
+export function getDeployPaths(network: Network): string[] {
+  const networkName = getNetworkName(network);
+  if (networkName === network.name) {
+    return network.deploy || store.networks[networkName]?.deploy; // fallback to global store
+  } else {
+    return store.networks[networkName]?.deploy; // skip network.deploy
+  }
+}
 
 export function mergeABIs(
   abis: any[][],
@@ -553,10 +575,17 @@ export function mergeABIs(
   return result;
 }
 
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function recode(decoded: any): Transaction {
   return {
     from: decoded.from,
-    gasPrice: BigNumber.from(decoded.from),
+    gasPrice: decoded.gasPrice ? BigNumber.from(decoded.gasPrice) : undefined,
+    maxFeePerGas: decoded.maxFeePerGas
+      ? BigNumber.from(decoded.maxFeePerGas)
+      : undefined,
+    maxPriorityFeePerGas: decoded.maxPriorityFeePerGas
+      ? BigNumber.from(decoded.maxPriorityFeePerGas)
+      : undefined,
     gasLimit: BigNumber.from(decoded.gasLimit),
     to: decoded.to,
     value: BigNumber.from(decoded.value),

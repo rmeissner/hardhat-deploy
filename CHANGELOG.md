@@ -1,5 +1,218 @@
 # hardhat-deploy
 
+## 0.9.8
+
+### Patch Changes
+
+- add wau to delete deployment and dotFIles
+
+## 0.9.7
+
+### Patch Changes
+
+- more etherscan-verify destination + saveDotFile
+
+## 0.9.6
+
+### Patch Changes
+
+- if deployment's tx is not found, error out to prevent redeployment by mistake
+
+## 0.9.5
+
+### Patch Changes
+
+- add etherscan for avalanche
+
+## 0.9.4
+
+### Patch Changes
+
+- add arbitrum testnet etherscan + add missing deps
+
+## 0.9.3
+
+### Patch Changes
+
+- fix deterministic function for proxies
+
+## 0.9.2
+
+### Patch Changes
+
+- - fix diamantaire diamonds constructor args generation
+  - Allow to define custom deterministic deployment information
+  - Skip Implementation deployment if already deployed
+  - Delete libraries link from proxy deploymen
+  - Add option to wait for specific number of confirmation when deploy a contract
+  - allow multiple export files by separating via commas
+
+## 0.9.1
+
+### Patch Changes
+
+- support eip-1559 for pending tx retry and add command line arg to specify globally the maxfee / priorityfee
+  support for arbiscan
+
+## 0.9.0
+
+### Minor Changes
+
+- f96f725: EIP-1559
+
+## 0.9.0-next.0
+
+### Minor Changes
+
+- EIP-1559
+
+## 0.8.11
+
+### Patch Changes
+
+- fix artifact info resolution
+
+## 0.8.10
+
+### Patch Changes
+
+- add mumbai for polygonscan
+
+## 0.8.9
+
+### Patch Changes
+
+- tags consider for external deploy scripts
+
+## 0.8.8
+
+### Patch Changes
+
+- remove error when from !+ proxyAdminOwner
+
+## 0.8.7
+
+### Patch Changes
+
+- fix deterministic proxy deployment when using Transparent Proxies (that uses a ProxyAdmin)
+
+## 0.8.6
+
+### Patch Changes
+
+- rework the unknown signer case
+
+## 0.8.5
+
+### Patch Changes
+
+- Revamp the fork handling
+
+## 0.8.4
+
+### Patch Changes
+
+- update dependencies
+
+## 0.8.3
+
+### Patch Changes
+
+- handle pending transactions
+
+## 0.8.2
+
+### Patch Changes
+
+- consider global gasprice everywhere + use latest nonce (not pending)
+
+## 0.8.1
+
+### Patch Changes
+
+- proxy auto fallback on owner to perform upgrade tx
+
+## 0.8.0
+
+### Minor Changes
+
+- 74c35d7: Add companion networks feature allowing to access multiple networks from same deploy script
+
+### Patch Changes
+
+- 3e0d44d: merge new Proxied in
+- 0276a09: merge from master fix for coverage
+- 0809a58: merge fixes from 0.7
+- proxy init option + breaking change: error on non-matching arg length even if implementation constructor has no args
+- cb9f57d: support self companion emulation
+- 7ecec00: merge from 0.7.11
+
+## 0.8.0-next.5
+
+### Patch Changes
+
+- merge from 0.7.11
+
+## 0.8.0-next.4
+
+### Patch Changes
+
+- merge fixes from 0.7
+
+## 0.8.0-next.3
+
+### Patch Changes
+
+- merge from master fix for coverage
+
+## 0.8.0-next.2
+
+### Patch Changes
+
+- support self companion emulation
+
+## 0.8.0-next.1
+
+### Patch Changes
+
+- merge new Proxied in
+
+## 0.8.0-next.0
+
+### Minor Changes
+
+- Add companion networks feature allowing to access multiple networks from same deploy script
+
+## 0.7.11
+
+### Patch Changes
+
+- add polygonscan + throw error when using fully qualified name as deployment name
+
+## 0.7.10
+
+### Patch Changes
+
+- add sleep option for etherscan to not exceed api rate-limit
+
+## 0.7.9
+
+### Patch Changes
+
+- republish
+
+## 0.7.8
+
+### Patch Changes
+
+- fix typing for etherscan
+
+## 0.7.7
+
+### Patch Changes
+
+- fix etherscan api type + add log option via env var
+
 ## 0.7.6
 
 ### Patch Changes

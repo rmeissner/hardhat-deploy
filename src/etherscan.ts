@@ -24,6 +24,10 @@ function logSuccess(...args: any[]) {
   console.log(chalk.green(...args));
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function extractOneLicenseFromSourceFile(source: string): string | undefined {
   const licenses = extractLicenseFromSources(source);
   if (licenses.length === 0) {
@@ -101,6 +105,7 @@ export async function submitSources(
     license?: string;
     fallbackOnSolcInput?: boolean;
     forceLicense?: boolean;
+    sleepBetween?: boolean;
   }
 ): Promise<void> {
   config = config || {};
@@ -108,6 +113,7 @@ export async function submitSources(
   const licenseOption = config.license;
   const forceLicense = config.forceLicense;
   const etherscanApiKey = config.etherscanApiKey;
+  const sleepBetween = config.sleepBetween;
   const chainId = await hre.getChainId();
   const all = await hre.deployments.all();
   let host: string;
@@ -124,6 +130,9 @@ export async function submitSources(
     case '5':
       host = 'https://api-goerli.etherscan.io';
       break;
+    case '10':
+      host = 'https://api-optimistic.etherscan.io';
+      break;
     case '42':
       host = 'https://api-kovan.etherscan.io';
       break;
@@ -133,11 +142,44 @@ export async function submitSources(
     case '56':
       host = 'https://api.bscscan.com';
       break;
+    case '69':
+      host = 'https://api-kovan-optimistic.etherscan.io';
+      break;
+    case '70':
+      host = 'https://api.hooscan.com';
+      break;
     case '128':
       host = 'https://api.hecoinfo.com';
       break;
+    case '137':
+      host = 'https://api.polygonscan.com';
+      break;
+    case '250':
+      host = 'https://api.ftmscan.com';
+      break;
     case '256':
       host = 'https://api-testnet.hecoinfo.com';
+      break;
+    case '1285':
+      host = 'https://api-moonriver.moonscan.io';
+      break;
+    case '80001':
+      host = 'https://api-testnet.polygonscan.com';
+      break; 
+    case '4002':
+      host = 'https://api-testnet.ftmscan.com';
+      break;
+    case '42161':
+      host = 'https://api.arbiscan.io'
+      break;
+    case '421611':
+      host = 'https://api-testnet.arbiscan.io'
+      break;
+    case '43113':
+      host = 'https://api-testnet.snowtrace.io'
+      break;
+    case '43114':
+      host = 'https://api.snowtrace.io'
       break;
     default:
       return logError(`Network with chainId: ${chainId} not supported`);
@@ -189,9 +231,8 @@ export async function submitSources(
     const contractNamePath = `${contractFilepath}:${contractName}`;
 
     const contractSourceFile = metadata.sources[contractFilepath].content;
-    const sourceLicenseType = extractOneLicenseFromSourceFile(
-      contractSourceFile
-    );
+    const sourceLicenseType =
+      extractOneLicenseFromSourceFile(contractSourceFile);
 
     let license = licenseOption;
     if (!sourceLicenseType) {
@@ -403,5 +444,10 @@ export async function submitSources(
 
   for (const name of Object.keys(all)) {
     await submit(name);
+
+    if (sleepBetween) {
+      // sleep between each verification so we don't exceed the API rate limit
+      await sleep(500);
+    }
   }
 }
