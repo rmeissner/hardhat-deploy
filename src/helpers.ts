@@ -55,7 +55,11 @@ import diamantaire from '../extendedArtifacts/Diamantaire.json';
 import {Artifact, EthereumProvider, Network} from 'hardhat/types';
 import {DeploymentsManager} from './DeploymentsManager';
 import EthersSafe from '@gnosis.pm/safe-core-sdk';
-import {SafeEthersSigner, SafeFactory, SafeService} from '@gnosis.pm/safe-ethers-adapters';
+import {
+  SafeEthersSigner,
+  SafeFactory,
+  SafeService,
+} from '@gnosis.pm/safe-ethers-adapters';
 import enquirer from 'enquirer';
 import {
   parse as parseTransaction,
@@ -396,18 +400,13 @@ export function addHelpers(
     maxFeePerGas?: string | BigNumber;
     maxPriorityFeePerGas?: string | BigNumber;
   }): Promise<string> {
-    const {
-      address: from,
-      ethersSigner,
-      hardwareWallet,
-      unknown,
-    } = getFrom(options.from);
-    const create2DeployerAddress =
-      await deploymentManager.getDeterministicDeploymentFactoryAddress();
+    const {address: from, ethersSigner, hardwareWallet, unknown} = getFrom(
+      options.from
+    );
+    const create2DeployerAddress = await deploymentManager.getDeterministicDeploymentFactoryAddress();
     const code = await provider.getCode(create2DeployerAddress);
     if (code === '0x') {
-      const senderAddress =
-        await deploymentManager.getDeterministicDeploymentFactoryDeployer();
+      const senderAddress = await deploymentManager.getDeterministicDeploymentFactoryDeployer();
 
       // TODO: calculate required funds
       const txRequest = {
@@ -508,12 +507,9 @@ export function addHelpers(
   ): Promise<DeployResult> {
     const args: any[] = options.args ? [...options.args] : [];
     await init();
-    const {
-      address: from,
-      ethersSigner,
-      hardwareWallet,
-      unknown,
-    } = getFrom(options.from);
+    const {address: from, ethersSigner, hardwareWallet, unknown} = getFrom(
+      options.from
+    );
 
     const {artifact: linkedArtifact, artifactName} = await getLinkedArtifact(
       name,
@@ -677,10 +673,12 @@ export function addHelpers(
       } = await _getProxyInfo(name, options);
       /* eslint-enable prefer-const */
 
-      const {address: implementationAddress} = await deterministic(
-        implementationName,
-        {...implementationOptions, salt: options.salt}
-      );
+      const {
+        address: implementationAddress,
+      } = await deterministic(implementationName, {
+        ...implementationOptions,
+        salt: options.salt,
+      });
 
       const implementationContract = new Contract(
         implementationAddress,
@@ -833,8 +831,7 @@ export function addHelpers(
           typeof options.deterministicDeployment === 'string'
             ? hexlify(zeroPad(options.deterministicDeployment, 32))
             : '0x0000000000000000000000000000000000000000000000000000000000000000';
-        const create2DeployerAddress =
-          await deploymentManager.getDeterministicDeploymentFactoryAddress();
+        const create2DeployerAddress = await deploymentManager.getDeterministicDeploymentFactoryAddress();
         const create2Address = getCreate2Address(
           create2DeployerAddress,
           create2Salt,
@@ -922,8 +919,10 @@ export function addHelpers(
           diffResult.address &&
           diffResult.address.toLowerCase() !== deployment.address.toLowerCase()
         ) {
-          const {artifact: linkedArtifact, artifactName} =
-            await getLinkedArtifact(name, options);
+          const {
+            artifact: linkedArtifact,
+            artifactName,
+          } = await getLinkedArtifact(name, options);
 
           // receipt missing
           const newDeployment = {
@@ -949,8 +948,10 @@ export function addHelpers(
           );
         }
 
-        const {artifact: linkedArtifact, artifactName} =
-          await getLinkedArtifact(name, options);
+        const {
+          artifact: linkedArtifact,
+          artifactName,
+        } = await getLinkedArtifact(name, options);
 
         // receipt missing
         const newDeployment = {
@@ -1536,7 +1537,9 @@ Note that in this case, the contract deployment will not behave the same if depl
     return getFrom(address);
   }
 
-  function getOptionalFrom(from?: string): {
+  function getOptionalFrom(
+    from?: string
+  ): {
     address?: Address;
     ethersSigner?: Signer;
     hardwareWallet?: string;
@@ -1551,30 +1554,14 @@ Note that in this case, the contract deployment will not behave the same if depl
     return getFrom(from);
   }
 
-<<<<<<< HEAD
   function getFrom(
-    from?: string
-  ): {address: Address; ethersSigner?: Signer; hardwareWallet?: string} {
-    return _getFrom(from, false) as {
-      address: Address;
-      ethersSigner?: Signer;
-      hardwareWallet?: string;
-    };
-  }
-
-  function _getFrom(
-    from?: string,
-    optional?: boolean
-  ): {address?: Address; ethersSigner?: Signer; hardwareWallet?: string} {
-    log("_getFrom", from)
-=======
-  function getFrom(from: string): {
+    from: string
+  ): {
     address: Address;
     ethersSigner: Signer;
     hardwareWallet?: string;
     unknown: boolean;
   } {
->>>>>>> df59005b68a829729ec39b3888929a02bd172867
     let ethersSigner: Signer | undefined;
     let hardwareWallet: string | undefined = undefined;
     let unknown = false;
@@ -1606,18 +1593,22 @@ Note that in this case, the contract deployment will not behave the same if depl
             ethersSigner = new Wallet(registeredProtocol.substr(13), provider);
           } else if (registeredProtocol.startsWith('safe')) {
             const split = registeredProtocol.substr(7).split('##');
-            log("Safe Proto", split)
+            log('Safe Proto', split);
             const safeAddress = split[0];
             const signer = _getFrom(split[1]).ethersSigner;
             const serviceUrl = split[2];
-            log("serviceUrl", serviceUrl)
-            const service = new SafeService(serviceUrl)
-            const { ethers } = require('ethers')
-            console.log(provider)
-            const factory: any = EthersSafe.create({ethers, safeAddress, providerOrSigner: signer})
-            Object.assign(factory, { getAddress: () => safeAddress })
-            log("factory", factory)
-            ethersSigner = new SafeEthersSigner(factory, service, provider)
+            log('serviceUrl', serviceUrl);
+            const service = new SafeService(serviceUrl);
+            const {ethers} = require('ethers');
+            console.log(provider);
+            const factory: any = EthersSafe.create({
+              ethers,
+              safeAddress,
+              providerOrSigner: signer,
+            });
+            Object.assign(factory, {getAddress: () => safeAddress});
+            log('factory', factory);
+            ethersSigner = new SafeEthersSigner(factory, service, provider);
           }
         }
       }
@@ -2101,12 +2092,9 @@ Note that in this case, the contract deployment will not behave the same if depl
   async function rawTx(tx: SimpleTx): Promise<Receipt> {
     tx = {...tx};
     await init();
-    const {
-      address: from,
-      ethersSigner,
-      hardwareWallet,
-      unknown,
-    } = getFrom(tx.from);
+    const {address: from, ethersSigner, hardwareWallet, unknown} = getFrom(
+      tx.from
+    );
 
     const transactionData = {
       to: tx.to,
@@ -2233,12 +2221,9 @@ data: ${data}
   ): Promise<Receipt> {
     options = {...options}; // ensure no change
     await init();
-    const {
-      address: from,
-      ethersSigner,
-      hardwareWallet,
-      unknown,
-    } = getFrom(options.from);
+    const {address: from, ethersSigner, hardwareWallet, unknown} = getFrom(
+      options.from
+    );
 
     let tx;
     const deployment = await partialExtension.get(name);
@@ -2263,8 +2248,8 @@ data: ${data}
       );
     }
 
-    const numArguments =
-      ethersContract.interface.getFunction(methodName).inputs.length;
+    const numArguments = ethersContract.interface.getFunction(methodName).inputs
+      .length;
     if (args.length !== numArguments) {
       throw new Error(
         `expected ${numArguments} arguments for method "${methodName}", got ${args.length}`
